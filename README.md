@@ -28,8 +28,8 @@ This project is a program designed for the analysis of **conversion electron and
 1. **Clone the repository**:
 
    ```bash
-   git clone https://github.com/yourusername/your-repo-name.git
-   cd your-repo-name
+   git clone https://github.com/JChads4/EPIC.git
+   cd EPIC
    ```
 
 2. **Set up a virtual environment** (optional but recommended):
@@ -83,6 +83,8 @@ This project is a program designed for the analysis of **conversion electron and
    ```bash
    python main.py input.txt
    ```
+
+   If the generate background flag is set 'True' (which it should be for the first time running the code). The user need only right click points where the background is (by default the background is set to go to 0 at 25), and once finished close the window. The program will generate the fiteed curve data points as a txt file in the /data directory, and can be used in future by then setting the generate background flag to 'False'.
 
 4. **View the Results**:
 
