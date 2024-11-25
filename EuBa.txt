@@ -1,0 +1,19 @@
+# Paths to data files
+loc = data/EuBa
+data_file = electrons.dat
+gamma_spectrum_file = gammas.dat
+
+# Flags and parameters
+fit_range = 200,500
+elec_eff_params = 1.473,-1.541,-0.943,-0.128,-0.00137
+gam_eff_params = -2.7,-0.61,-0.21,0.24,-0.09
+elec_fwhm_params = 0.00660,5.5675
+generate_background = True
+
+# Gamma info
+nucleus,energy,multipolarity,delta,gamma_int,err_gamma_int
+# Ba peaks
+cs,276,E2,0,325278,1140
+cs,303,M1+E2,0.2,782395,1769
+cs,356,E2,0,2447777,1550
+cs,384,E2,0,339006,1164

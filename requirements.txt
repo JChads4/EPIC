@@ -1,0 +1,7 @@
+numpy
+tabulate
+pandas
+matplotlib
+scienceplots
+scipy
+argparse
