@@ -136,6 +136,6 @@ This project is licensed under the MIT License.
 
 ## Contact
 
-For questions or feedback, please contact [Your Name] at [jamiechadderton8@gmail.com.com].
+For questions or feedback, please contact Jamie Chadderton at [jamiechadderton8@gmail.com].
 
 ---
