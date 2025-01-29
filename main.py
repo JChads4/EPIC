@@ -20,9 +20,9 @@ except ModuleNotFoundError:
 
 ############################### BACKGROUND FUNCTIONS #################################################
 
-def background(energy, a, b, c):
+def background(energy, a, c):
     energy_safe = np.where(energy == 0, 1, energy)  # Avoid division by zero
-    return a * (1 - np.sqrt(b / energy_safe)) * np.exp(c * energy)
+    return a * (1 - np.sqrt(25 / energy_safe)) * np.exp(c * energy)
 
 def draw_points(energy, counts, output_path, filename):
     fig, ax = plt.subplots()
@@ -74,15 +74,26 @@ def load_data(folder, filename):
 def fwhm(energy, m, c):
     return m * energy + c
 
-def elec_efficiency(energy, a, b, c, d, e):
+def silicon_efficiency(energy, a, b, c, d, e):
     x = np.log(energy / 320)
     eff = np.exp(a + (b * x) + (c * x**2) + (d * x**3) + (e * x**4))
     return eff / 100
 
-def gamma_efficiency(energy, a, b, c, d, e):
+def germanium_efficiency(energy, a, b, c, d, e):
     x = np.log(energy / 320)
     eff = np.exp(a + (b * x) + (c * x**2) + (d * x**3) + (e * x**4))
     return eff
+
+def elec_efficiency(energy, a, b, c, d, e):
+    x = np.log(energy)  
+    log_eff = a + b*x + c*x**2 + d*x**3 + e*x**4
+    return np.exp(log_eff)/100
+
+def gamma_efficiency(energy, A, B, D, E, F):
+    x = np.log(energy/100)
+    y = np.log(energy/1000)
+    log_eff = ((A + B*x)**(-3) + (D + E*y + F*y**2)**(-3))**(-1/3)
+    return np.exp(log_eff)/1000
 
 def err_elec_efficiency(eff):
     return 0.1 * eff
@@ -133,23 +144,23 @@ def calculate_conversion_coefficients(element, energy, multipolarity, delta):
 
     if multipolarity == 'E2':
         cmd = f'briccs -S {element} -g {energy} -L E2 -a'
-        print(f"Running command: {cmd}")
+        # print(f"Running command: {cmd}")
         result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
-        print(f"BrIccs output for E2:\n{result.stdout}\n{result.stderr}")
+        # print(f"BrIccs output for E2:\n{result.stdout}\n{result.stderr}")
         alphas.update(parse_briccs_output(result.stdout, multipolarity='E2'))
 
     elif multipolarity == 'M1':
         cmd = f'briccs -S {element} -g {energy} -L M1 -a'
-        print(f"Running command: {cmd}")
+        # print(f"Running command: {cmd}")
         result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
-        print(f"BrIccs output for M1:\n{result.stdout}\n{result.stderr}")
+        # print(f"BrIccs output for M1:\n{result.stdout}\n{result.stderr}")
         alphas.update(parse_briccs_output(result.stdout, multipolarity='M1'))
 
     elif multipolarity == 'E1':
         cmd = f'briccs -S {element} -g {energy} -L E1 -a'
-        print(f"Running command: {cmd}")
+        # print(f"Running command: {cmd}")
         result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
-        print(f"BrIccs output for E1:\n{result.stdout}\n{result.stderr}")
+        # print(f"BrIccs output for E1:\n{result.stdout}\n{result.stderr}")
         alphas.update(parse_briccs_output(result.stdout, multipolarity='E1'))
 
         # Run M2s just to see
@@ -161,7 +172,7 @@ def calculate_conversion_coefficients(element, energy, multipolarity, delta):
 
     elif multipolarity == 'M1+E2':
         cmd = f'briccs -S {element} -g {energy} -d {delta:.4f} -L M1+E2 -a'
-        print(f"Running command: {cmd}")
+        # print(f"Running command: {cmd}")
         result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
         # print(f"BrIccs output for M1+E2:\n{result.stdout}\n{result.stderr}")
         alphas.update(parse_briccs_output(result.stdout, multipolarity='M1+E2'))
@@ -269,7 +280,7 @@ def main():
     # Read input file
     variables, gamma_info_df = parse_input_file(args.input_filename)
 
-    print(gamma_info_df)
+    # print(gamma_info_df)
 
     # Extract variables
     loc = variables.get('loc', '')
@@ -388,20 +399,20 @@ def analyse(level_scheme_data, loc, data_file, fit_range, elec_eff_params, gam_e
 
     ################################ GAMMA INTENSITY CALCULATIONS ######################################################
 
-    print('Err Gamma Intensity')
-    print(df['Err Gamma Intensity'])
+    # print('Err Gamma Intensity')
+    # print(df['Err Gamma Intensity'])
 
-    print(gam_eff_params)
+    # print(gam_eff_params)
 
     df['Gamma Eff'] = gamma_efficiency(df['Energy'], *gam_eff_params)
     df['Err Gamma Eff'] = err_gamma_efficiency(df['Gamma Eff'])
 
     gamma_eff_ratio = df['Err Gamma Eff'] / df['Gamma Eff'].replace(0, np.nan)
-    print('GAMMAS EFF RATIO')
-    print(gamma_eff_ratio)
+    # print('GAMMAS EFF RATIO')
+    # print(gamma_eff_ratio)
     gamma_int_ratio = df[f'Err Gamma Intensity'] / df['Gamma Intensity'].replace(0, np.nan)
-    print('Gamma Int ratio')
-    print(gamma_int_ratio)
+    # print('Gamma Int ratio')
+    # print(gamma_int_ratio)
 
     df['Gamma Int Emit'] = df['Gamma Intensity'] / df['Gamma Eff']
     df['Err Gamma Int Emit'] = df['Gamma Int Emit'] * (np.array(gamma_eff_ratio)**2 + np.array(gamma_int_ratio)**2)**0.5
@@ -429,6 +440,31 @@ def analyse(level_scheme_data, loc, data_file, fit_range, elec_eff_params, gam_e
 
     df = pd.concat([df, pd.DataFrame(new_columns)], axis=1)
 
+    ######################################## ELECTRON EFFICIENCY RESULTS ################################################
+
+    print('########################################################')
+    print('############## ELECTRON EFFICIENCY RESULTS ##############')
+    print('########################################################')
+
+    elec_dfs = {}
+    for shell in ['K', 'L-tot', 'M-tot']:
+        elec_dfs[shell] = df[[f'Eic {shell}', f'Electron Eff Alpha {shell}']]
+        print(f"Table for {shell} shell:")
+        print(tabulate(elec_dfs[shell], headers='keys', tablefmt='pretty'))
+        print("\n")
+
+    ######################################## ELECTRON EFFICIENCY RESULTS ################################################
+
+    print('########################################################')
+    print('############## GAMMA EFFICIENCY RESULTS ##############')
+    print('########################################################')
+
+    gam_eff_df = df[['Energy', 'Gamma Eff', 'Err Gamma Eff']]
+    print(tabulate(gam_eff_df, headers='keys', tablefmt='pretty'))
+    print("\n")
+
+
+
     ######################################## ELECTRON INTENSITY RESULTS ################################################
 
     print('########################################################')
@@ -455,15 +491,14 @@ def analyse(level_scheme_data, loc, data_file, fit_range, elec_eff_params, gam_e
                         ['Energy', 'E_Int_meas P-tot', 'E_Int_meas P1', 'E_Int_meas P2', 'E_Int_meas P3'])
     Qshell_df = format_df(df[['Energy', 'E_Int_meas Q']], ['Energy', 'E_Int_meas Q'])
 
-    print(tabulate(totals_df, headers='keys', tablefmt='pretty'))
-    print(tabulate(Kshell_df, headers='keys', tablefmt='pretty'))
-    print(tabulate(Lshell_df, headers='keys', tablefmt='pretty'))
-    print(tabulate(Mshell_df, headers='keys', tablefmt='pretty'))
-    print(tabulate(Nshell_df, headers='keys', tablefmt='pretty'))
-    print(tabulate(Oshell_df, headers='keys', tablefmt='pretty'))
-    print(tabulate(Pshell_df, headers='keys', tablefmt='pretty'))
-    print(tabulate(Qshell_df, headers='keys', tablefmt='pretty'))
-
+    # print(tabulate(totals_df, headers='keys', tablefmt='pretty'))
+    # print(tabulate(Kshell_df, headers='keys', tablefmt='pretty'))
+    # print(tabulate(Lshell_df, headers='keys', tablefmt='pretty'))
+    # print(tabulate(Mshell_df, headers='keys', tablefmt='pretty'))
+    # print(tabulate(Nshell_df, headers='keys', tablefmt='pretty'))
+    # print(tabulate(Oshell_df, headers='keys', tablefmt='pretty'))
+    # print(tabulate(Pshell_df, headers='keys', tablefmt='pretty'))
+    # print(tabulate(Qshell_df, headers='keys', tablefmt='pretty'))
     
     ######################################### PLOT GAMMA AND ELECTRON SPECTRA #########################################
 
@@ -481,8 +516,7 @@ def analyse(level_scheme_data, loc, data_file, fit_range, elec_eff_params, gam_e
     x_bkg, y_bkg = bkg[:, 0], bkg[:, 1]
 
     # Fitting background
-    a, b, c = 180, 25, -0.025  # Sage model background initial guesses
-    # TODO add a HV barrier variable for this.
+    a, c = 200, -0.02  # Sage model background initial guesses
     e_min, e_max = fit_range if fit_range else (min(energy), max(energy))
     fit_indices = (energy >= e_min) & (energy <= e_max)
     energy_fit = energy[fit_indices]
@@ -494,9 +528,20 @@ def analyse(level_scheme_data, loc, data_file, fit_range, elec_eff_params, gam_e
     for shell in ['Tot', 'K', 'L-tot', 'L1', 'L2', 'L3', 'M-tot', 'M1', 'M2', 'M3', 'M4', 'M5', 'N-tot', 'N1', 'N2', 'N3', 'N4', 'N5', 'N6', 'N7', 'O-tot', 'O1', 'O2', 'O3', 'O4', 'O5', 'P-tot', 'P1', 'P2', 'P3', 'P4', 'P5', 'Q']:
         df[f'E_Area_meas {shell}'] = df[f'E_Int_meas {shell}'] * bin_width
         df[f'Err_E_Area_meas {shell}'] = df[f'E_Area_meas {shell}'] * (df[f'Err E Int meas {shell}'] /df[f'E_Int_meas {shell}'] )
-    popt_r, pcov_r = curve_fit(background, x_bkg, y_bkg, p0=[a, b, c], bounds=([-np.inf, 24.99, -np.inf], [np.inf, 25.01, np.inf]))
+    # popt_r, pcov_r = curve_fit(background, x_bkg, y_bkg, p0=[a, b, c], bounds=([190, 24.99, -np.inf], [300, 25.01, np.inf]))
+    popt_r, pcov_r = curve_fit(background, x_bkg, y_bkg, p0=[a, c], bounds=([0, -np.inf], [np.inf, np.inf]))
     optimal_back_curve_r = background(e_range, *popt_r)
     std_dev_r = compute_error_bands(popt_r, pcov_r, background, e_range, optimal_back_curve_r)
+
+    # Printing the fitted background curve parameters
+    param_errs = np.sqrt(np.diag(pcov_r))
+    parameter_names = ['a', 'c']
+    table_data = []
+    for name, value, error in zip(parameter_names, popt_r, std_dev_r):
+        table_data.append([name, f"{value:.=10f}", f"{error:.10f}"])
+    headers = ["Parameter", "Fitted Value", "Error"]
+    pretty_table = tabulate(table_data, headers=headers, tablefmt="pretty")
+    print(pretty_table)
 
     # Plot experimental data
     plt.step(energy, counts, where='pre', label='Data', color='k', alpha=0.6)
@@ -624,6 +669,7 @@ def analyse(level_scheme_data, loc, data_file, fit_range, elec_eff_params, gam_e
 
     # Show the plot
     plt.subplots_adjust(bottom=0.1, top=0.9)
+    # ax1.set_visible(False)
     plt.show()
     plt.close(fig)
 
@@ -656,20 +702,20 @@ def analyse(level_scheme_data, loc, data_file, fit_range, elec_eff_params, gam_e
     lower_bounds = [-0.000001] + [0] * len(df)
     upper_bounds = [0.000001] + [np.inf] * len(df)
 
-    print('########################################################')
-    print('################## FITTING CHECKS ######################')
-    print('########################################################')
+    # print('########################################################')
+    # print('################## FITTING CHECKS ######################')
+    # print('########################################################')
 
     # Print the initial parameters to debug
-    print("Initial Parameters:")
-    print("Initial Scales:", initial_scales)
-    print("Initial Params:", initial_params)
-    print("Lower Bounds:", lower_bounds)
-    print("Upper Bounds:", upper_bounds)
+    # print("Initial Parameters:")
+    # print("Initial Scales:", initial_scales)
+    # print("Initial Params:", initial_params)
+    # print("Lower Bounds:", lower_bounds)
+    # print("Upper Bounds:", upper_bounds)
 
     # Print the data to be fitted to debug
-    print("Energy Fit:", energy_fit)
-    print("Counts Fit:", counts_fit)
+    # print("Energy Fit:", energy_fit)
+    # print("Counts Fit:", counts_fit)
 
     # Ensure data is finite
     energy_fit = np.nan_to_num(energy_fit, nan=0.0, posinf=0.0, neginf=0.0)
@@ -677,7 +723,7 @@ def analyse(level_scheme_data, loc, data_file, fit_range, elec_eff_params, gam_e
 
     # Check the output of the model function with initial parameters
     initial_model_output = ScaleTransitions_ShiftEnergy(energy_fit, *initial_params)
-    print("Initial Model Output:", initial_model_output)
+    # print("Initial Model Output:", initial_model_output)
 
     # Ensure the initial model output is finite
     if not np.all(np.isfinite(initial_model_output)):
@@ -881,13 +927,13 @@ def analyse(level_scheme_data, loc, data_file, fit_range, elec_eff_params, gam_e
     Qshell_df = format_df(df[['Energy', 'Fitted_Int Q']], ['Energy', 'Fitted_Int Q'])
 
 
-    print(tabulate(Kshell_df, headers='keys', tablefmt='pretty'))
-    print(tabulate(Lshell_df, headers='keys', tablefmt='pretty'))
-    print(tabulate(Mshell_df, headers='keys', tablefmt='pretty'))
-    print(tabulate(Nshell_df, headers='keys', tablefmt='pretty'))
-    print(tabulate(Oshell_df, headers='keys', tablefmt='pretty'))
-    print(tabulate(Pshell_df, headers='keys', tablefmt='pretty'))
-    print(tabulate(Qshell_df, headers='keys', tablefmt='pretty'))
+    # print(tabulate(Kshell_df, headers='keys', tablefmt='pretty'))
+    # print(tabulate(Lshell_df, headers='keys', tablefmt='pretty'))
+    # print(tabulate(Mshell_df, headers='keys', tablefmt='pretty'))
+    # print(tabulate(Nshell_df, headers='keys', tablefmt='pretty'))
+    # print(tabulate(Oshell_df, headers='keys', tablefmt='pretty'))
+    # print(tabulate(Pshell_df, headers='keys', tablefmt='pretty'))
+    # print(tabulate(Qshell_df, headers='keys', tablefmt='pretty'))
 
     ############################################## CONVERSION COEFFICIENT CALCULATION #########################################################
     
@@ -900,21 +946,21 @@ def analyse(level_scheme_data, loc, data_file, fit_range, elec_eff_params, gam_e
         new_columns[f'Err Meas_alpha_{shell}'] =  new_columns[f'Meas_alpha_{shell}'] * ((df[f'Err Fitted Int Emit {shell}']/df[f'Fitted Int Emit {shell}'])**2 + (df['Err Gamma Int Emit'] /df['Gamma Int Emit'] )**2)**(0.5)
     
         # Debug: Print to check if the new columns are formed correctly
-        print(f"### DEBUG SUBSHELLS {shell} ###")
-        print(f"Meas_alpha_{shell}:")
-        print(new_columns[f'Meas_alpha_{shell}'].head())
-        print(f"Err Meas_alpha_{shell}:")
-        print(new_columns[f'Err Meas_alpha_{shell}'].head())
+        # print(f"### DEBUG SUBSHELLS {shell} ###")
+        # print(f"Meas_alpha_{shell}:")
+        # print(new_columns[f'Meas_alpha_{shell}'].head())
+        # print(f"Err Meas_alpha_{shell}:")
+        # print(new_columns[f'Err Meas_alpha_{shell}'].head())
 
 
 
     df = pd.concat([df, pd.DataFrame(new_columns)], axis=1)
 
-    for shell in subshells:
-        if df[f'Meas_alpha_{shell}'].shape == df[f'Err Meas_alpha_{shell}'].shape:
-            print(f"Subshell {shell}: Dimensions match. YEEEEEEEEEEEESSSSSSSSSSSSSSSSSSSSSS")
-        else:
-            print(f"Subshell {shell}: Dimension mismatch. NOOOOOOOOOOOOOOOOOOO")
+    # for shell in subshells:
+    #     if df[f'Meas_alpha_{shell}'].shape == df[f'Err Meas_alpha_{shell}'].shape:
+    #         print(f"Subshell {shell}: Dimensions match. YEEEEEEEEEEEESSSSSSSSSSSSSSSSSSSSSS")
+    #     else:
+    #         print(f"Subshell {shell}: Dimension mismatch. NOOOOOOOOOOOOOOOOOOO")
 
     # print('################## DEBUG SUBSHELL CALC #######################')
     # # Print values for the first row only
@@ -961,13 +1007,13 @@ def analyse(level_scheme_data, loc, data_file, fit_range, elec_eff_params, gam_e
     # Qshell_df = format_df(df[['Energy', 'Meas_alpha_Q', 'Err Meas_alpha_Q']], ['Energy', 'Meas_alpha_Q', 'Err Meas_alpha_Q'])
 
 
-    print(tabulate(Kshell_df, headers='keys', tablefmt='pretty'))
-    print(tabulate(Lshell_df, headers='keys', tablefmt='pretty'))
-    print(tabulate(Mshell_df, headers='keys', tablefmt='pretty'))
-    print(tabulate(Nshell_df, headers='keys', tablefmt='pretty'))
-    print(tabulate(Oshell_df, headers='keys', tablefmt='pretty'))
-    print(tabulate(Pshell_df, headers='keys', tablefmt='pretty'))
-    print(tabulate(Qshell_df, headers='keys', tablefmt='pretty'))
+    # print(tabulate(Kshell_df, headers='keys', tablefmt='pretty'))
+    # print(tabulate(Lshell_df, headers='keys', tablefmt='pretty'))
+    # print(tabulate(Mshell_df, headers='keys', tablefmt='pretty'))
+    # print(tabulate(Nshell_df, headers='keys', tablefmt='pretty'))
+    # print(tabulate(Oshell_df, headers='keys', tablefmt='pretty'))
+    # print(tabulate(Pshell_df, headers='keys', tablefmt='pretty'))
+    # print(tabulate(Qshell_df, headers='keys', tablefmt='pretty'))
 
     # SHELLS
 
@@ -1009,7 +1055,7 @@ def analyse(level_scheme_data, loc, data_file, fit_range, elec_eff_params, gam_e
                     'Meas_alpha_Q', 'Alpha_Q_briccs']].round(2)
 
     # Print out the results
-    print(tabulate(totals_df, headers='keys', tablefmt='pretty'))
+    # print(tabulate(totals_df, headers='keys', tablefmt='pretty'))
     
     ############################################## CONVERSION COEFFICIENT PLOTTING #########################################################
     def plot_conversion_coefficients(df, subshells):
@@ -1128,13 +1174,13 @@ def analyse(level_scheme_data, loc, data_file, fit_range, elec_eff_params, gam_e
     for shell in err_meas_alpha_totals:
         err_meas_alpha_totals[shell] = df[f'Err Meas_alpha_{shell}'].replace(np.nan, 0).to_numpy()
 
-    print("### DEBUG INFO ###")
-    for shell, electron_energy in electron_energies.items():
-        print(f"Shell: {shell}")
-        print("Electron Energy:", electron_energy.to_numpy())
-        print("Meas Alpha Totals:", meas_alpha_totals[shell].to_numpy())
-        print("Err Meas Alpha Totals:", err_meas_alpha_totals[shell])
-        print("---------------")
+    # print("### DEBUG INFO ###")
+    # for shell, electron_energy in electron_energies.items():
+    #     print(f"Shell: {shell}")
+    #     print("Electron Energy:", electron_energy.to_numpy())
+    #     print("Meas Alpha Totals:", meas_alpha_totals[shell].to_numpy())
+    #     print("Err Meas Alpha Totals:", err_meas_alpha_totals[shell])
+    #     print("---------------")
 
     ################################################# LM Coefficient plot
     def plot_conversion_coefficients_with_arrows(df):
